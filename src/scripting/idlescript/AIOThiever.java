@@ -70,6 +70,7 @@ public class AIOThiever extends IdleScript {
 	ArrayList<ThievingObject> objects = new ArrayList<ThievingObject>() {{
 		add(new ThievingObject("Man", 11, true, false));
 		add(new ThievingObject("Farmer", 63, true, false));
+		add(new ThievingObject("Farmer (Ardougne)", 319, true, false));
 		add(new ThievingObject("Warrior", 86, true, false));
 		add(new ThievingObject("Workman", 722, true, false));
 		add(new ThievingObject("Rogue", 342, true, false));

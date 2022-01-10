@@ -34,7 +34,7 @@ import javax.swing.JLabel;
  * @author Dvorak (modified by Searos)
  */
 
-public class AIOSmelter extends IdleScript {
+public class SmelterRunner extends IdleScript {
 	JFrame scriptFrame = null;
 	boolean guiSetup = false;
 	boolean scriptStarted = false;
@@ -43,6 +43,7 @@ public class AIOSmelter extends IdleScript {
 	int destinationId = -1;
 	int[] barIds = { 169, 170, 384, 171, 1041, 172, 173, 174, 408, 44, 1027, 283, 288, 296, 284, 289, 297, 285, 290, 298, 286, 291, 299, 287, 292, 300, 543, 544, 524 };
 	
+	String[] traders;
 	long startTimestamp = System.currentTimeMillis() / 1000L;
 	int success = 0;
 	
@@ -304,6 +305,8 @@ public class AIOSmelter extends IdleScript {
 							break;
 						}
 					}
+
+					traders = parameters[2].split(",");
 					
 					if(barId == -1 || ingredients == null)
 						throw new Exception("Ingredients not selected!");
@@ -323,6 +326,9 @@ public class AIOSmelter extends IdleScript {
 		return 1000; //start() must return a int value now. 
 	}
 
+	boolean acceptedTrade = false;
+	boolean tradeRecipientAccepted = false;
+
 	public void scriptStart() {
 		if (isEnoughOre()) {
 			while (controller.getNearestObjectById(118) == null) {
@@ -335,65 +341,70 @@ public class AIOSmelter extends IdleScript {
 					controller.walkTo(84, 679, 0, true);
 				}
 			}
+
 			Iterator<Entry<Integer, Integer>> iterator = ingredients.entrySet().iterator();
-			int oreId = iterator.next().getKey();
-			int mouldAnswer = -1;
-			int gemAnswer = 0;
-			
-			if (oreId == 1057) { // do not use the cannonball mold on the furnace!
-				oreId = 171;
-			} else if(controller.getInventoryItemCount(293) > 0) {
-				oreId = 172;
-				mouldAnswer = 0;
-			} else if(controller.getInventoryItemCount(295) > 0) {
-				oreId = 172;
-				mouldAnswer = 1;
-			} else if(controller.getInventoryItemCount(294) > 0) {
-				oreId = 172;
-				mouldAnswer = 2;
-			}
+			Entry<Integer, Integer> node = iterator.next();
+			int oreId = node.getKey();
+			int oreAmount = node.getValue();
+			if (iterator.hasNext()) {
+				node = iterator.next();	
+			}		
+			int oreId2 = node.getKey();
+			int oreAmount2 = node.getValue() / oreAmount;
+			oreAmount = 1;
 
-			if(controller.getInventoryItemCount(164) > 0)
-				gemAnswer = 1;
-			if(controller.getInventoryItemCount(163) > 0)
-				gemAnswer = 2;
-			if(controller.getInventoryItemCount(162) > 0)
-				gemAnswer = 3;
-			if(controller.getInventoryItemCount(161) > 0)
-				gemAnswer = 4;
-			if(controller.getInventoryItemCount(523) > 0) 
-				gemAnswer = 5;
-			
-			while (controller.getInventoryItemCount(oreId) > 0 && controller.getNearestObjectById(118) != null) {
-
-				while (controller.isBatching())
-					controller.sleep(10);
-
-				if (controller.getInventoryItemCount(699) > 0) { // wield gauntlets
-					controller.setStatus("Wielding gauntlets..");
-					controller.equipItem(controller.getInventoryItemSlotIndex(699));
-					controller.sleep(618);
+			//while ((controller.getInventoryItemCount(oreId) > 0 || controller.getInventoryItemCount(oreId2) > 0) && controller.getNearestObjectById(118) != null) {
+			while (isEnoughOre() && controller.getNearestObjectById(118) != null) {
+				controller.setStatus("Trading..");
+				if (!tradeRecipientAccepted && controller.isTradeRecipientAccepting()) {
+					tradeRecipientAccepted = true;
+					acceptedTrade = false;
+					controller.sleep(700);
+				} else if (tradeRecipientAccepted && !controller.isTradeRecipientAccepting()) {
+					tradeRecipientAccepted = false;
+					acceptedTrade = false;
+					controller.sleep(700);
 				}
-
-				controller.setStatus("Smelting!");
-				controller.sleepHandler(98, true);
-				controller.useItemIdOnObject(controller.getNearestObjectById(118)[0],
-						controller.getNearestObjectById(118)[1], oreId);
-				
-				if (oreId == 171) {
-					controller.sleep(3000); // cannonballs take way longer and can be interrupted by starting another one
-				} else if(oreId == 172) {
-					controller.sleep(800);
-					controller.optionAnswer(mouldAnswer);
-					controller.sleep(800);
-					controller.optionAnswer(gemAnswer);
-					controller.sleep(250);
-				} else {
-					controller.sleep(618);
+				if (controller.isInTradeConfirmation()) {
+					controller.acceptTradeConfirmation();
+					acceptedTrade = true;
+				} else if (controller.isInTrade() && !controller.isInTradeConfirmation() && !acceptedTrade) {
+					int size1 = Math.min(12, controller.getInventoryItemCount(oreId));
+					int size2 = Math.min(12, controller.getInventoryItemCount(oreId2));
+					int[] ids = new int[Math.min(12, size1 + size2)];
+					int[] amounts = new int[Math.min(12, size1 + size2)];
+					int oreCounter = 0;
+					boolean usingOre1 = true;
+					for (int i = 0; i < ids.length; ++i) {
+						if (oreCounter >= (usingOre1 ? oreAmount : oreAmount2)) {
+							oreCounter = 0;
+							usingOre1 = !usingOre1;
+						}
+						ids[i] = (usingOre1 ? oreId : oreId2);
+						amounts[i] = 1;
+						oreCounter++;
+					}
+					controller.setTradeItems(ids, amounts);
+					controller.sleep(700);
+					controller.acceptTrade();
+					acceptedTrade = true;
+				} else if (!controller.isInTrade()) {
+					for (int i = 0; i < traders.length; ++i) {
+						int playerServerIndex = controller.getPlayerServerIndexByName(traders[i]);
+						if (playerServerIndex >= 0) {
+							controller.sleep(700);
+							if (!controller.isInTrade()) {
+								controller.tradePlayer(playerServerIndex);
+								controller.sleep(700);
+								if (controller.isInTrade()) {
+									tradeRecipientAccepted = false;
+									acceptedTrade = false;
+									break;
+								}
+							}
+						}
+					}
 				}
-
-				while (controller.isBatching())
-					controller.sleep(10);
 			}
 
 		} else {
