@@ -1181,7 +1181,7 @@ public class Controller {
 	 * @return boolean
 	 */
 	public boolean isDoorOpen(int x, int y) {
-		int[] naughtyDoors = new int[] {163, 164, 68, 97, 96, 43, 162, 94};
+		int[] naughtyDoors = new int[] {163, 164, 68, 97, 96, 43, 162, 94, 95};
 		
 		int[] ids = getWallObjectIds();
 		int[] xs = getWallObjectsX();
@@ -1258,6 +1258,17 @@ public class Controller {
 	 * @param y
 	 */
 	public void openDoor(int x, int y) {
+		openDoor(x, y, false);
+	}
+
+	/**
+	 * Opens the door at the specified coordinates. Does nothing if the door is already open.
+	 * Set option2 to true for alternate actions on doors.
+	 * @param x
+	 * @param y
+	 * @param option2
+	 */
+	public void openDoor(int x, int y, boolean option2) {
 		
 		if(isDoorOpen(x, y) == true) {
 			System.out.println("door already open");
@@ -1266,8 +1277,9 @@ public class Controller {
 
 		int opcode = 127;
 		int direction = getWallObjectDirectionAtCoord(x, y); 
+		int wallObjId = this.getWallObjectIdAtCoord(x, y);
 		
-		if(this.getWallObjectIdAtCoord(x, y) == 163 || this.getWallObjectIdAtCoord(x, y) == 164 || this.getWallObjectIdAtCoord(x, y) == 43 
+		if(option2 || wallObjId == 163 || wallObjId == 164 || wallObjId == 43
 				|| ((this.currentX() == 609) && this.currentY() == 1548)) {
 			opcode = 14; //we want WALL_COMMAND1 for these IDs
 			//height = 1;
